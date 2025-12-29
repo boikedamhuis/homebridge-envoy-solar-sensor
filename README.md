@@ -1,10 +1,10 @@
-Homebridge Envoy Solar Sensor
+# Homebridge Envoy Solar Sensor
 
 Homebridge Envoy Solar Sensor is a Homebridge platform plugin that reads real time solar production data from an Enphase Envoy and exposes it to Apple HomeKit as a sensor.
 
-By converting photovoltaic production into a simple active or inactive state, HomeKit automations can react to actual daylight conditions instead of fixed schedules or unreliable ambient light sensors. This makes it ideal for switching outdoor lighting, garden lights or other devices based on real solar output.
+By converting photovoltaic production into a simple active or inactive state, HomeKit automations can react to actual daylight conditions instead of fixed schedules or unreliable ambient light sensors. This makes the plugin ideal for switching outdoor lighting, garden lights or other devices based on actual solar output.
 
-How it works
+## How it works
 
 The plugin periodically polls the local Enphase Envoy for current solar production measured in watts.
 
@@ -14,91 +14,63 @@ When production falls below a configurable off threshold, the sensor becomes ina
 Using two separate thresholds creates hysteresis, preventing rapid switching during clouds, shade or twilight conditions.
 
 In HomeKit the sensor is exposed as a Contact Sensor.
-Active solar production is represented as an open contact.
-Low or no production is represented as a closed contact.
 
-Supported Envoy endpoints
+An open contact represents active solar production.
+A closed contact represents low or no solar production.
 
-The plugin supports the most commonly available local Envoy endpoints.
+## Supported Envoy endpoints
 
-Older Envoy firmware using the production.json endpoint.
-Newer Envoy firmware using the api v1 production endpoint.
+The plugin supports the most common local Envoy endpoints.
+
+production.json for older and many current Envoy firmware versions
+api/v1/production for newer firmware versions
 
 The correct endpoint can be selected directly in the Homebridge UI.
 
-Installation
+## Authentication token
+
+Some Enphase Envoy installations require authentication to access local production data.
+
+To obtain an access token, visit:
+
+https://entrez.enphaseenergy.com/
+
+Log in with your Enphase account and generate a bearer token.
+
+Paste only the token value into the Authentication Token field in the Homebridge UI.
+Do not include the word Bearer.
+
+The token is used only for local communication with the Envoy and is never sent to external services.
+
+## HTTPS and self signed certificates
+
+Many Enphase Envoy devices use a self signed HTTPS certificate.
+
+If HTTPS requests fail, enable Allow Insecure TLS in the Homebridge UI.
+This allows Homebridge to connect securely to the Envoy without certificate validation errors.
+
+## Installation
 
 Install Homebridge if it is not already installed on your system.
 
 Install the plugin using npm.
 
+```bash
 npm install homebridge-envoy-solar-sensor
+```
 
+Restart Homebridge after installation.
 
-Restart Homebridge after installation to load the plugin.
-
-Configuration using Homebridge UI
+## Configuration using Homebridge UI
 
 This plugin is fully configurable using the Homebridge web interface.
 
 Open the Homebridge UI and navigate to the plugin settings for Homebridge Envoy Solar Sensor.
 All configuration options are presented as form fields and no manual editing of config.json is required.
 
-The Envoy IP Address field should contain the local IP address or hostname of your Enphase Envoy.
+## Debugging and logging
 
-The Protocol option allows selecting HTTP or HTTPS depending on your Envoy configuration.
+Debug Logging enables continuous logging of production watts at debug level.
 
-The Envoy API Mode setting determines which endpoint is used to read production data.
-
-The Poll Interval defines how often the Envoy is queried for new production values.
-
-The On Threshold specifies the production level in watts above which the sensor becomes active.
-
-The Off Threshold specifies the production level in watts below which the sensor becomes inactive again.
-
-An optional authentication token can be provided for secured Envoy installations.
-
-Example Homebridge configuration
-
-When configured through the UI, Homebridge generates the following configuration internally.
-
-{
-  "platform": "EnvoySolarSensor",
-  "name": "Solar Production",
-  "host": "192.168.1.50",
-  "protocol": "http",
-  "mode": "productionJson",
-  "pollIntervalSeconds": 10,
-  "onThresholdW": 80,
-  "offThresholdW": 30
-}
-
-HomeKit automations
-
-Once the plugin is running, a Contact Sensor named Solar Production appears in the Home app.
-
-Typical automations include turning outdoor lights off when solar production becomes active and turning outdoor lights on when solar production becomes inactive.
-
-Because the automation is based on real solar output, lighting behavior naturally adapts to seasons, weather and cloud cover.
-
-Error handling and reliability
-
-If the Envoy cannot be reached or returns invalid data, the sensor reports a fault state in HomeKit.
-Once communication is restored, the fault state is cleared automatically.
-
-Polling is fully local and does not rely on cloud services.
-
-Requirements
-
-Node.js version 18 or higher is required.
-Homebridge version 1.6 or higher is required.
-An Enphase Envoy accessible on the local network is required.
-
-License
-
-This project is licensed under the MIT License.
-
-Contributing
-
-Contributions, improvements and feature requests are welcome.
-Please open an issue or pull request on GitHub.
+Debug Burst Count logs the next configured number of polls at info level and then automatically stops.
+This is useful for short term diagnostics without flooding the logs.
