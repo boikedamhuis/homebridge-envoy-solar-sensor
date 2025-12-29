@@ -1,6 +1,6 @@
 'use strict';
 
-const { Agent } = require('undici');
+const { Agent, request } = require('undici');
 
 const PLUGIN_NAME = 'homebridge-envoy-solar-sensor';
 const PLATFORM_NAME = 'EnvoySolarSensor';
@@ -203,10 +203,7 @@ class EnvoySolarPlatform {
     const candidate = eim || production || inverters || productionArray[0];
     const wNow = candidate && candidate.wNow;
 
-    if (typeof wNow !== 'number') {
-      throw new Error('production.json mist wNow in production items');
-    }
-
+    if (typeof wNow !== 'number') throw new Error('production.json mist wNow in production items');
     return Math.max(0, wNow);
   }
 
@@ -232,13 +229,23 @@ class EnvoySolarPlatform {
       ? new Agent({ connect: { rejectUnauthorized: !allowInsecureTLS } })
       : undefined;
 
-    const res = await fetch(url, { headers, dispatcher });
+    try {
+      const res = await request(url, { method: 'GET', headers, dispatcher });
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`HTTP ${res.status} op ${url} ${text}`);
+      if (res.statusCode === 401 || res.statusCode === 403) {
+        throw new Error(`HTTP ${res.statusCode} unauthorized. Check token and that you pasted token only, without 'Bearer'.`);
+      }
+
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        const body = await res.body.text().catch(() => '');
+        throw new Error(`HTTP ${res.statusCode} op ${url} ${body}`);
+      }
+
+      const text = await res.body.text();
+      return JSON.parse(text);
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e);
+      throw new Error(`fetch failed: ${msg} url=${url} insecureTLS=${allowInsecureTLS}`);
     }
-
-    return await res.json();
   }
 }
