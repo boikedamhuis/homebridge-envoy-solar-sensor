@@ -21,6 +21,9 @@ class EnvoySolarPlatform {
     this.accessory = null;
     this.pollTimer = null;
 
+    this.learnedExpectedInverters = 0;
+    this.lastLeakState = null;
+
     this.api.on('didFinishLaunching', () => {
       this.log.info('Platform gestart');
       this.setupAccessory();
@@ -58,18 +61,34 @@ class EnvoySolarPlatform {
       .setCharacteristic(this.Characteristic.Model, 'Envoy')
       .setCharacteristic(this.Characteristic.SerialNumber, String(host));
 
-    const service = this.accessory.getService(this.Service.ContactSensor)
+    const productionService = this.accessory.getService(this.Service.ContactSensor)
       || this.accessory.addService(this.Service.ContactSensor, 'Production Active', 'production-active');
 
-    service.setCharacteristic(this.Characteristic.Name, 'Production Active');
+    productionService.setCharacteristic(this.Characteristic.Name, 'Production Active');
 
-    if (service.testCharacteristic(this.Characteristic.StatusActive)) {
-      service.updateCharacteristic(this.Characteristic.StatusActive, true);
+    if (productionService.testCharacteristic(this.Characteristic.StatusActive)) {
+      productionService.updateCharacteristic(this.Characteristic.StatusActive, true);
     }
 
-    if (service.testCharacteristic(this.Characteristic.StatusFault)) {
-      service.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.NO_FAULT);
+    if (productionService.testCharacteristic(this.Characteristic.StatusFault)) {
+      productionService.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.NO_FAULT);
     }
+
+    const inverterLeak = this.accessory.getService(this.Service.LeakSensor)
+      || this.accessory.addService(this.Service.LeakSensor, 'Inverter Alert', 'inverter-alert');
+
+    inverterLeak.setCharacteristic(this.Characteristic.Name, 'Inverter Alert');
+
+    if (inverterLeak.testCharacteristic(this.Characteristic.StatusActive)) {
+      inverterLeak.updateCharacteristic(this.Characteristic.StatusActive, true);
+    }
+
+    if (inverterLeak.testCharacteristic(this.Characteristic.StatusFault)) {
+      inverterLeak.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.NO_FAULT);
+    }
+
+    inverterLeak.updateCharacteristic(this.Characteristic.LeakDetected, this.Characteristic.LeakDetected.LEAK_NOT_DETECTED);
+    this.lastLeakState = this.Characteristic.LeakDetected.LEAK_NOT_DETECTED;
 
     this.log.info(`Accessoire klaar: ${name} op host ${host}`);
   }
@@ -84,11 +103,19 @@ class EnvoySolarPlatform {
       try {
         const watts = await this.readProductionWatts();
         this.logWatts(watts);
-        this.updateState(watts);
+        this.updateProductionState(watts);
       } catch (err) {
         const msg = err && err.message ? err.message : String(err);
-        this.log.warn(`Uitlezen mislukt: ${msg}`);
-        this.markFault();
+        this.log.warn(`Uitlezen productie mislukt: ${msg}`);
+        this.markProductionFault();
+      }
+
+      try {
+        await this.checkInvertersAndUpdateLeak();
+      } catch (err) {
+        const msg = err && err.message ? err.message : String(err);
+        this.log.warn(`Uitlezen omvormers mislukt: ${msg}`);
+        this.markInverterFault();
       }
     };
 
@@ -157,7 +184,13 @@ class EnvoySolarPlatform {
     }
   }
 
-  markFault() {
+  getExpectedInverters() {
+    const n = Number(this.config.expectedInverters ?? 0);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.floor(n);
+  }
+
+  markProductionFault() {
     if (!this.accessory) return;
     const service = this.accessory.getService(this.Service.ContactSensor);
     if (!service) return;
@@ -167,7 +200,7 @@ class EnvoySolarPlatform {
     }
   }
 
-  clearFault() {
+  clearProductionFault() {
     if (!this.accessory) return;
     const service = this.accessory.getService(this.Service.ContactSensor);
     if (!service) return;
@@ -177,7 +210,27 @@ class EnvoySolarPlatform {
     }
   }
 
-  updateState(productionWatts) {
+  markInverterFault() {
+    if (!this.accessory) return;
+    const service = this.accessory.getService(this.Service.LeakSensor);
+    if (!service) return;
+
+    if (service.testCharacteristic(this.Characteristic.StatusFault)) {
+      service.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.GENERAL_FAULT);
+    }
+  }
+
+  clearInverterFault() {
+    if (!this.accessory) return;
+    const service = this.accessory.getService(this.Service.LeakSensor);
+    if (!service) return;
+
+    if (service.testCharacteristic(this.Characteristic.StatusFault)) {
+      service.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.NO_FAULT);
+    }
+  }
+
+  updateProductionState(productionWatts) {
     if (!this.accessory) return;
 
     const service = this.accessory.getService(this.Service.ContactSensor);
@@ -190,22 +243,85 @@ class EnvoySolarPlatform {
 
     let shouldBeOpen = isOpenNow;
 
-    if (!isOpenNow && productionWatts >= onT) {
-      shouldBeOpen = true;
-    }
-
-    if (isOpenNow && productionWatts <= offT) {
-      shouldBeOpen = false;
-    }
+    if (!isOpenNow && productionWatts >= onT) shouldBeOpen = true;
+    if (isOpenNow && productionWatts <= offT) shouldBeOpen = false;
 
     const nextValue = shouldBeOpen
       ? this.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED
       : this.Characteristic.ContactSensorState.CONTACT_DETECTED;
 
     service.updateCharacteristic(this.Characteristic.ContactSensorState, nextValue);
-    this.clearFault();
+    this.clearProductionFault();
 
     this.log.debug(`Productie ${productionWatts} W, aan ${onT} W, uit ${offT} W, actief ${shouldBeOpen}`);
+  }
+
+  async checkInvertersAndUpdateLeak() {
+    if (!this.accessory) return;
+
+    const leakService = this.accessory.getService(this.Service.LeakSensor);
+    if (!leakService) return;
+
+    const onlineCount = await this.readOnlineInverterCount();
+    const configuredExpected = this.getExpectedInverters();
+
+    if (configuredExpected <= 0 && this.learnedExpectedInverters <= 0) {
+      this.learnedExpectedInverters = onlineCount;
+      this.log.info(`Expected inverter count learned: ${this.learnedExpectedInverters}`);
+    }
+
+    const expected = configuredExpected > 0 ? configuredExpected : this.learnedExpectedInverters;
+    const missing = onlineCount < expected;
+
+    const nextLeakState = missing
+      ? this.Characteristic.LeakDetected.LEAK_DETECTED
+      : this.Characteristic.LeakDetected.LEAK_NOT_DETECTED;
+
+    leakService.updateCharacteristic(this.Characteristic.LeakDetected, nextLeakState);
+    this.clearInverterFault();
+
+    if (this.lastLeakState !== nextLeakState) {
+      this.lastLeakState = nextLeakState;
+
+      if (missing) {
+        this.log.warn(`Inverter Alert: online ${onlineCount}, expected ${expected}`);
+      } else {
+        this.log.info(`Inverter Alert cleared: online ${onlineCount}, expected ${expected}`);
+      }
+    } else {
+      this.log.debug(`Inverters: online ${onlineCount}, expected ${expected}`);
+    }
+  }
+
+  async readOnlineInverterCount() {
+    const base = this.getBaseUrl();
+
+    try {
+      const url = `${base}/api/v1/production/inverters`;
+      const data = await this.fetchJson(url);
+
+      if (Array.isArray(data)) {
+        const online = data.filter((x) => {
+          if (!x) return false;
+          const wNow = x.wNow ?? x.lastReportWatts ?? x.wattsNow;
+          return typeof wNow === 'number';
+        });
+        if (online.length > 0) return online.length;
+      }
+    } catch (e) {
+    }
+
+    const url = `${base}/production.json`;
+    const data = await this.fetchJson(url);
+
+    const productionArray = data && data.production;
+    if (!Array.isArray(productionArray)) throw new Error('production.json mist production array');
+
+    const inv = productionArray.find((x) => x && x.type === 'inverters');
+    const activeCount = inv && inv.activeCount;
+
+    if (typeof activeCount !== 'number') throw new Error('production.json mist activeCount voor type inverters');
+    return Math.max(0, activeCount);
   }
 
   async readProductionWatts() {
@@ -262,23 +378,18 @@ class EnvoySolarPlatform {
       ? new Agent({ connect: { rejectUnauthorized: !allowInsecureTLS } })
       : undefined;
 
-    try {
-      const res = await request(url, { method: 'GET', headers, dispatcher });
+    const res = await request(url, { method: 'GET', headers, dispatcher });
 
-      if (res.statusCode === 401 || res.statusCode === 403) {
-        throw new Error(`HTTP ${res.statusCode} unauthorized. Check token and that you pasted token only, without 'Bearer'.`);
-      }
-
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        const body = await res.body.text().catch(() => '');
-        throw new Error(`HTTP ${res.statusCode} op ${url} ${body}`);
-      }
-
-      const text = await res.body.text();
-      return JSON.parse(text);
-    } catch (e) {
-      const msg = e && e.message ? e.message : String(e);
-      throw new Error(`fetch failed: ${msg} url=${url} insecureTLS=${allowInsecureTLS}`);
+    if (res.statusCode === 401 || res.statusCode === 403) {
+      throw new Error(`HTTP ${res.statusCode} unauthorized. Check token and that you pasted token only, without Bearer.`);
     }
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      const body = await res.body.text().catch(() => '');
+      throw new Error(`HTTP ${res.statusCode} op ${url} ${body}`);
+    }
+
+    const text = await res.body.text();
+    return JSON.parse(text);
   }
 }

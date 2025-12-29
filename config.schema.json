@@ -16,7 +16,7 @@
         "title": "Envoy Address",
         "type": "string",
         "default": "envoy.local",
-        "description": "IP address or hostname of the Enphase Envoy on your local network (envoy.local)"
+        "description": "IP address or hostname of the Enphase Envoy on your local network"
       },
       "protocol": {
         "title": "Protocol",
@@ -39,14 +39,8 @@
         "type": "string",
         "default": "productionJson",
         "oneOf": [
-          {
-            "title": "production.json",
-            "enum": ["productionJson"]
-          },
-          {
-            "title": "api/v1/production",
-            "enum": ["v1Production"]
-          }
+          { "title": "production.json", "enum": ["productionJson"] },
+          { "title": "api/v1/production", "enum": ["v1Production"] }
         ],
         "description": "Select the Envoy API endpoint to read production data"
       },
@@ -55,7 +49,7 @@
         "type": "integer",
         "default": 60,
         "minimum": 5,
-        "description": "How often the Envoy is polled for production data"
+        "description": "How often the Envoy is polled"
       },
       "onThresholdW": {
         "title": "On Threshold (W)",
@@ -74,6 +68,14 @@
         "type": "string",
         "default": "",
         "description": "Bearer token from Enphase Entrez, paste token only without the word Bearer"
+      },
+      "expectedInverters": {
+        "title": "Expected Inverters",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 200,
+        "description": "If set to 0, the plugin learns the expected inverter count from the first successful reading"
       },
       "debugLogging": {
         "title": "Debug Logging",
