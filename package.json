@@ -1,35 +1,34 @@
 {
     "name": "homebridge-envoy-solar-sensor",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Expose Enphase Envoy solar production as a HomeKit sensor for daylight-based automations",
     "main": "index.js",
     "keywords": [
-      "homebridge-plugin",
-      "homebridge",
-      "homekit",
-      "enphase",
-      "envoy",
-      "solar",
-      "pv",
-      "daylight",
-      "automation"
+        "homebridge-plugin",
+        "homebridge",
+        "homekit",
+        "enphase",
+        "envoy",
+        "solar",
+        "pv",
+        "daylight",
+        "automation"
     ],
     "homepage": "https://github.com/boikedamhuis/homebridge-envoy-solar-sensor#readme",
     "repository": {
-      "type": "git",
-      "url": "git+https://github.com/boikedamhuis/homebridge-envoy-solar-sensor.git"
+        "type": "git",
+        "url": "git+https://github.com/boikedamhuis/homebridge-envoy-solar-sensor.git"
     },
     "bugs": {
-      "url": "https://github.com/boikedamhuis/homebridge-envoy-solar-sensor/issues"
+        "url": "https://github.com/boikedamhuis/homebridge-envoy-solar-sensor/issues"
     },
     "license": "MIT",
     "engines": {
-      "node": ">=18.0.0",
-      "homebridge": ">=1.6.0"
+        "node": ">=18.0.0",
+        "homebridge": ">=1.6.0"
     },
     "author": {
-      "name": "Boike Damhuis",
-      "url": "https://github.com/boikedamhuis"
+        "name": "Boike Damhuis",
+        "url": "https://github.com/boikedamhuis"
     }
-  }
-  
+}
