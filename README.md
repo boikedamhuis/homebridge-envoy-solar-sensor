@@ -1,3 +1,10 @@
+[![npm version](https://img.shields.io/npm/v/homebridge-envoy-solar-sensor)](https://www.npmjs.com/package/homebridge-envoy-solar-sensor)
+[![npm downloads](https://img.shields.io/npm/dt/homebridge-envoy-solar-sensor)](https://www.npmjs.com/package/homebridge-envoy-solar-sensor)
+[![license](https://img.shields.io/npm/l/homebridge-envoy-solar-sensor)](https://github.com/boikedamhuis/homebridge-envoy-solar-sensor/blob/main/LICENSE)
+[![homebridge](https://img.shields.io/badge/homebridge-%3E%3D1.6.0-blue)](https://homebridge.io/)
+[![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org/)
+
+
 # Homebridge Envoy Solar Sensor
 
 Homebridge Envoy Solar Sensor is a Homebridge platform plugin that reads real time solar production data from an Enphase Envoy and exposes it to Apple HomeKit as a sensor.
