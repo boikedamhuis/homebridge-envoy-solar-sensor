@@ -1,0 +1,27 @@
+{
+  "name": "homebridge-envoy-solar-sensor",
+  "version": "0.1.0",
+  "description": "Expose Enphase Envoy PV production as a HomeKit sensor for automations",
+  "main": "index.js",
+  "keywords": [
+    "homebridge-plugin",
+    "homekit",
+    "enphase",
+    "envoy",
+    "solar"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "homebridge": ">=1.6.0"
+  },
+  "license": "MIT",
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourname/homebridge-envoy-solar-sensor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourname/homebridge-envoy-solar-sensor/issues"
+  },
+  "homepage": "https://github.com/yourname/homebridge-envoy-solar-sensor#readme"
+}
