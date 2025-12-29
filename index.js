@@ -83,6 +83,7 @@ class EnvoySolarPlatform {
     const tick = async () => {
       try {
         const watts = await this.readProductionWatts();
+        this.logWatts(watts);
         this.updateState(watts);
       } catch (err) {
         const msg = err && err.message ? err.message : String(err);
@@ -122,6 +123,38 @@ class EnvoySolarPlatform {
 
   isInsecureTLSEnabled() {
     return Boolean(this.config.allowInsecureTLS);
+  }
+
+  isDebugLoggingEnabled() {
+    return Boolean(this.config.debugLogging);
+  }
+
+  getDebugBurstCount() {
+    const n = Number(this.config.debugBurstCount ?? 0);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.floor(n);
+  }
+
+  consumeDebugBurst() {
+    const n = this.getDebugBurstCount();
+    if (n <= 0) return 0;
+    this.config.debugBurstCount = n - 1;
+    return n;
+  }
+
+  logWatts(productionWatts) {
+    const burst = this.getDebugBurstCount();
+    const debugEnabled = this.isDebugLoggingEnabled();
+
+    if (burst > 0) {
+      const before = this.consumeDebugBurst();
+      this.log.info(`Envoy production: ${productionWatts} W (debug burst remaining: ${before - 1})`);
+      return;
+    }
+
+    if (debugEnabled) {
+      this.log.debug(`Envoy production: ${productionWatts} W`);
+    }
   }
 
   markFault() {

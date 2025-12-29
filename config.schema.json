@@ -74,6 +74,20 @@
         "type": "string",
         "default": "",
         "description": "Bearer token from Enphase Entrez, paste token only without the word Bearer"
+      },
+      "debugLogging": {
+        "title": "Debug Logging",
+        "type": "boolean",
+        "default": false,
+        "description": "Log production watts on every poll"
+      },
+      "debugBurstCount": {
+        "title": "Debug Burst Count",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0,
+        "maximum": 200,
+        "description": "If set, logs the next N polls at INFO level for easier debugging"
       }
     }
   }
