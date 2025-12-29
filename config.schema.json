@@ -10,86 +10,117 @@
         "title": "Accessory Name",
         "type": "string",
         "default": "Solar Production",
-        "description": "Name shown in HomeKit"
+        "description": "Name shown in Apple Home for the solar production accessory"
       },
+
       "host": {
         "title": "Envoy Address",
         "type": "string",
         "default": "envoy.local",
         "description": "IP address or hostname of the Enphase Envoy on your local network"
       },
+
       "protocol": {
-        "title": "Protocol",
+        "title": "Connection Protocol",
         "type": "string",
         "default": "https",
         "oneOf": [
-          { "title": "HTTPS", "enum": ["https"] },
+          { "title": "HTTPS (recommended)", "enum": ["https"] },
           { "title": "HTTP", "enum": ["http"] }
         ],
         "description": "Protocol used to connect to the Envoy"
       },
+
       "allowInsecureTLS": {
-        "title": "Allow Insecure TLS",
+        "title": "Allow Self-Signed HTTPS Certificate",
         "type": "boolean",
         "default": true,
-        "description": "Enable this if your Envoy uses a self-signed HTTPS certificate"
+        "description": "Enable this if your Envoy uses a self-signed HTTPS certificate (most installations)"
       },
+
       "mode": {
-        "title": "Envoy API Mode",
+        "title": "Envoy API Endpoint",
         "type": "string",
         "default": "productionJson",
         "oneOf": [
-          { "title": "production.json", "enum": ["productionJson"] },
-          { "title": "api/v1/production", "enum": ["v1Production"] }
+          {
+            "title": "production.json (most Envoy systems)",
+            "enum": ["productionJson"]
+          },
+          {
+            "title": "api/v1/production (newer firmware)",
+            "enum": ["v1Production"]
+          }
         ],
-        "description": "Select the Envoy API endpoint to read production data"
+        "description": "Select which Envoy API endpoint is used to read production data"
       },
+
       "pollIntervalSeconds": {
-        "title": "Poll Interval (seconds)",
+        "title": "Polling Interval",
         "type": "integer",
-        "default": 60,
+        "default": 10,
         "minimum": 5,
-        "description": "How often the Envoy is polled"
+        "description": "How often the Envoy is queried for data, in seconds"
       },
+
       "onThresholdW": {
-        "title": "On Threshold (W)",
+        "title": "Production ON Threshold (W)",
         "type": "integer",
         "default": 80,
-        "description": "Production level above which the sensor becomes active"
+        "description": "Solar production level above which the Production Active sensor becomes active"
       },
+
       "offThresholdW": {
-        "title": "Off Threshold (W)",
+        "title": "Production OFF Threshold (W)",
         "type": "integer",
         "default": 30,
-        "description": "Production level below which the sensor becomes inactive"
+        "description": "Solar production level below which the Production Active sensor becomes inactive"
       },
+
       "token": {
         "title": "Authentication Token",
         "type": "string",
         "default": "",
-        "description": "Bearer token from Enphase Entrez, paste token only without the word Bearer"
+        "description": "Bearer token obtained from https://entrez.enphaseenergy.com (paste token only, without 'Bearer')"
       },
+
+      "enableInverterLeakSensor": {
+        "title": "Enable Inverter Failure Monitoring",
+        "type": "boolean",
+        "default": true,
+        "description": "Expose a Leak Sensor in HomeKit that triggers when one or more inverters go offline"
+      },
+
       "expectedInverters": {
-        "title": "Expected Inverters",
+        "title": "Expected Number of Inverters",
         "type": "integer",
         "default": 0,
         "minimum": 0,
         "maximum": 200,
-        "description": "If set to 0, the plugin learns the expected inverter count from the first successful reading"
+        "description": "If set to 0, the plugin automatically learns the inverter count from the first successful reading"
       },
-      "debugLogging": {
-        "title": "Debug Logging",
+
+      "inverterDebug": {
+        "title": "Inverter Debug Logging",
         "type": "boolean",
         "default": false,
-        "description": "Log production watts on every poll"
+        "description": "Log detailed information about inverter checks, data source and inverter counts"
       },
+
+      "debugLogging": {
+        "title": "Production Debug Logging",
+        "type": "boolean",
+        "default": false,
+        "description": "Log solar production watts on every poll at debug level"
+      },
+
       "debugBurstCount": {
-        "title": "Debug Burst Count",
+        "title": "Temporary Debug Burst",
         "type": "integer",
         "default": 0,
         "minimum": 0,
         "maximum": 200,
-        "description": "If set, logs the next N polls at INFO level for easier debugging"
+        "description": "Log the next N polling cycles at info level, then stop automatically"
       }
     }
   }
