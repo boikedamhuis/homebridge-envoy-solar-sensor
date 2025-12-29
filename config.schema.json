@@ -1,74 +1,80 @@
 {
-    "pluginAlias": "EnvoySolarSensor",
-    "pluginType": "platform",
-    "singular": true,
-    "schema": {
-      "type": "object",
-      "required": ["host"],
-      "properties": {
-        "name": {
-          "title": "Accessory Name",
-          "type": "string",
-          "default": "Solar Production",
-          "description": "Name shown in HomeKit"
-        },
-        "host": {
-          "title": "Envoy IP Address",
-          "type": "string",
-          "description": "IP address or hostname of the Enphase Envoy on your local network"
-        },
-        "protocol": {
-          "title": "Protocol",
-          "type": "string",
-          "default": "http",
-          "oneOf": [
-            { "title": "HTTP", "enum": ["http"] },
-            { "title": "HTTPS", "enum": ["https"] }
-          ],
-          "description": "Protocol used to connect to the Envoy"
-        },
-        "mode": {
-          "title": "Envoy API Mode",
-          "type": "string",
-          "default": "productionJson",
-          "oneOf": [
-            {
-              "title": "production.json (older Envoy)",
-              "enum": ["productionJson"]
-            },
-            {
-              "title": "api/v1/production (newer Envoy)",
-              "enum": ["v1Production"]
-            }
-          ],
-          "description": "Select which Envoy API endpoint is available on your device"
-        },
-        "pollIntervalSeconds": {
-          "title": "Poll Interval",
-          "type": "integer",
-          "default": 10,
-          "minimum": 5,
-          "description": "How often the Envoy is polled for production data in seconds"
-        },
-        "onThresholdW": {
-          "title": "On Threshold (Watts)",
-          "type": "integer",
-          "default": 80,
-          "description": "Production level above which the sensor becomes active"
-        },
-        "offThresholdW": {
-          "title": "Off Threshold (Watts)",
-          "type": "integer",
-          "default": 30,
-          "description": "Production level below which the sensor becomes inactive"
-        },
-        "token": {
-          "title": "Authentication Token",
-          "type": "string",
-          "default": "",
-          "description": "Optional bearer token for secured Envoy endpoints"
-        }
+  "pluginAlias": "EnvoySolarSensor",
+  "pluginType": "platform",
+  "singular": true,
+  "schema": {
+    "type": "object",
+    "required": ["host"],
+    "properties": {
+      "name": {
+        "title": "Accessory Name",
+        "type": "string",
+        "default": "Solar Production",
+        "description": "Name shown in HomeKit"
+      },
+      "host": {
+        "title": "Envoy Address",
+        "type": "string",
+        "default": "envoy.local",
+        "description": "IP address or hostname of the Enphase Envoy on your local network"
+      },
+      "protocol": {
+        "title": "Protocol",
+        "type": "string",
+        "default": "https",
+        "oneOf": [
+          { "title": "HTTPS", "enum": ["https"] },
+          { "title": "HTTP", "enum": ["http"] }
+        ],
+        "description": "Protocol used to connect to the Envoy"
+      },
+      "allowInsecureTLS": {
+        "title": "Allow Insecure TLS",
+        "type": "boolean",
+        "default": true,
+        "description": "Enable this if your Envoy uses a self-signed HTTPS certificate"
+      },
+      "mode": {
+        "title": "Envoy API Mode",
+        "type": "string",
+        "default": "productionJson",
+        "oneOf": [
+          {
+            "title": "production.json",
+            "enum": ["productionJson"]
+          },
+          {
+            "title": "api/v1/production",
+            "enum": ["v1Production"]
+          }
+        ],
+        "description": "Select the Envoy API endpoint to read production data"
+      },
+      "pollIntervalSeconds": {
+        "title": "Poll Interval (seconds)",
+        "type": "integer",
+        "default": 10,
+        "minimum": 5,
+        "description": "How often the Envoy is polled for production data"
+      },
+      "onThresholdW": {
+        "title": "On Threshold (W)",
+        "type": "integer",
+        "default": 80,
+        "description": "Production level above which the sensor becomes active"
+      },
+      "offThresholdW": {
+        "title": "Off Threshold (W)",
+        "type": "integer",
+        "default": 30,
+        "description": "Production level below which the sensor becomes inactive"
+      },
+      "token": {
+        "title": "Authentication Token",
+        "type": "string",
+        "default": "",
+        "description": "Bearer token from Enphase Entrez, paste token only without the word Bearer"
       }
     }
   }
-  
+}

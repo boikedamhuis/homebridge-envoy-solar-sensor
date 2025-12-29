@@ -1,5 +1,7 @@
 'use strict';
 
+const { Agent } = require('undici');
+
 const PLUGIN_NAME = 'homebridge-envoy-solar-sensor';
 const PLATFORM_NAME = 'EnvoySolarSensor';
 
@@ -31,10 +33,11 @@ class EnvoySolarPlatform {
   }
 
   setupAccessory() {
-    const name = this.config.name || 'Zon Opwekking';
+    const name = this.config.name || 'Solar Production';
     const host = this.config.host;
+
     if (!host) {
-      this.log.error('Config mist host. Voorbeeld: "host": "192.168.1.50"');
+      this.log.error('Config mist host. Voorbeeld host: "envoy.local" of "192.168.1.50"');
       return;
     }
 
@@ -56,12 +59,16 @@ class EnvoySolarPlatform {
       .setCharacteristic(this.Characteristic.SerialNumber, String(host));
 
     const service = this.accessory.getService(this.Service.ContactSensor)
-      || this.accessory.addService(this.Service.ContactSensor, 'Opwekking Actief', 'production-active');
+      || this.accessory.addService(this.Service.ContactSensor, 'Production Active', 'production-active');
 
-    service.setCharacteristic(this.Characteristic.Name, 'Opwekking Actief');
+    service.setCharacteristic(this.Characteristic.Name, 'Production Active');
 
     if (service.testCharacteristic(this.Characteristic.StatusActive)) {
       service.updateCharacteristic(this.Characteristic.StatusActive, true);
+    }
+
+    if (service.testCharacteristic(this.Characteristic.StatusFault)) {
+      service.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.NO_FAULT);
     }
 
     this.log.info(`Accessoire klaar: ${name} op host ${host}`);
@@ -78,7 +85,8 @@ class EnvoySolarPlatform {
         const watts = await this.readProductionWatts();
         this.updateState(watts);
       } catch (err) {
-        this.log.warn(`Uitlezen mislukt: ${err && err.message ? err.message : String(err)}`);
+        const msg = err && err.message ? err.message : String(err);
+        this.log.warn(`Uitlezen mislukt: ${msg}`);
         this.markFault();
       }
     };
@@ -102,12 +110,18 @@ class EnvoySolarPlatform {
   }
 
   getToken() {
-    return this.config.token;
+    const t = this.config.token;
+    if (!t) return '';
+    return String(t).trim();
   }
 
   getBaseUrl() {
-    const proto = this.config.protocol || 'http';
-    return `${proto}://${this.getHost()}`;
+    const protocol = this.config.protocol || 'https';
+    return `${protocol}://${this.getHost()}`;
+  }
+
+  isInsecureTLSEnabled() {
+    return Boolean(this.config.allowInsecureTLS);
   }
 
   markFault() {
@@ -180,10 +194,19 @@ class EnvoySolarPlatform {
     const productionArray = data && data.production;
     if (!Array.isArray(productionArray)) throw new Error('production.json mist production array');
 
-    const eim = productionArray.find((x) => x && x.type === 'eim');
-    const wNow = eim && eim.wNow;
+    const byType = (t) => productionArray.find((x) => x && x.type === t);
 
-    if (typeof wNow !== 'number') throw new Error('production.json mist wNow (type eim)');
+    const eim = byType('eim');
+    const inverters = byType('inverters');
+    const production = byType('production');
+
+    const candidate = eim || production || inverters || productionArray[0];
+    const wNow = candidate && candidate.wNow;
+
+    if (typeof wNow !== 'number') {
+      throw new Error('production.json mist wNow in production items');
+    }
+
     return Math.max(0, wNow);
   }
 
@@ -199,13 +222,21 @@ class EnvoySolarPlatform {
 
   async fetchJson(url) {
     const headers = { Accept: 'application/json' };
+
     const token = this.getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    const res = await fetch(url, { headers });
+    const allowInsecureTLS = this.isInsecureTLSEnabled();
+
+    const dispatcher = url.startsWith('https://')
+      ? new Agent({ connect: { rejectUnauthorized: !allowInsecureTLS } })
+      : undefined;
+
+    const res = await fetch(url, { headers, dispatcher });
 
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status} op ${url}`);
+      const text = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status} op ${url} ${text}`);
     }
 
     return await res.json();
