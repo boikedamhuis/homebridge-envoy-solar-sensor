@@ -1,6 +1,6 @@
 {
     "name": "homebridge-envoy-solar-sensor",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Expose Enphase Envoy solar production as a HomeKit sensor for daylight-based automations",
     "main": "index.js",
     "keywords": [
