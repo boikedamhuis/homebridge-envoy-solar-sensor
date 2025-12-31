@@ -10,16 +10,14 @@
         "title": "Accessory Name",
         "type": "string",
         "default": "Solar Production",
-        "description": "Name shown in Apple Home for the solar production accessory"
+        "description": "Name shown in Apple Home for this accessory"
       },
-
       "host": {
         "title": "Envoy Address",
         "type": "string",
         "default": "envoy.local",
-        "description": "IP address or hostname of the Enphase Envoy on your local network"
+        "description": "IP address or hostname of your Enphase Envoy or IQ Gateway on the local network"
       },
-
       "protocol": {
         "title": "Connection Protocol",
         "type": "string",
@@ -30,97 +28,104 @@
         ],
         "description": "Protocol used to connect to the Envoy"
       },
-
       "allowInsecureTLS": {
-        "title": "Allow Self-Signed HTTPS Certificate",
+        "title": "Allow Self Signed HTTPS Certificate",
         "type": "boolean",
         "default": true,
-        "description": "Enable this if your Envoy uses a self-signed HTTPS certificate (most installations)"
+        "description": "Enable this if your Envoy uses a self signed HTTPS certificate (common). If disabled and the Envoy uses a self signed certificate, requests may fail"
       },
-
       "mode": {
-        "title": "Envoy API Endpoint",
+        "title": "Production Endpoint",
         "type": "string",
         "default": "productionJson",
         "oneOf": [
-          {
-            "title": "production.json (most Envoy systems)",
-            "enum": ["productionJson"]
-          },
-          {
-            "title": "api/v1/production (newer firmware)",
-            "enum": ["v1Production"]
-          }
+          { "title": "production.json (most systems)", "enum": ["productionJson"] },
+          { "title": "api/v1/production (newer firmware)", "enum": ["v1Production"] }
         ],
-        "description": "Select which Envoy API endpoint is used to read production data"
+        "description": "Select the Envoy endpoint used to read current production"
       },
-
       "pollIntervalSeconds": {
-        "title": "Polling Interval",
+        "title": "Polling Interval (seconds)",
         "type": "integer",
         "default": 10,
         "minimum": 5,
-        "description": "How often the Envoy is queried for data, in seconds"
+        "description": "How often the Envoy is queried for updates"
       },
-
       "onThresholdW": {
         "title": "Production ON Threshold (W)",
         "type": "integer",
         "default": 80,
-        "description": "Solar production level above which the Production Active sensor becomes active"
+        "description": "If production is equal or above this value, the Production Active sensor becomes active"
       },
-
       "offThresholdW": {
         "title": "Production OFF Threshold (W)",
         "type": "integer",
         "default": 30,
-        "description": "Solar production level below which the Production Active sensor becomes inactive"
+        "description": "If production is equal or below this value, the Production Active sensor becomes inactive"
       },
-
       "token": {
-        "title": "Authentication Token",
+        "title": "Manual Authentication Token",
         "type": "string",
         "default": "",
-        "description": "Bearer token obtained from https://entrez.enphaseenergy.com (paste token only, without 'Bearer')"
+        "description": "Optional. Paste the bearer token value only (without the word Bearer). If Auto JWT Token Refresh is enabled, this manual token is not used"
       },
-
+      "autoJwt": {
+        "title": "Auto JWT Token Refresh",
+        "type": "boolean",
+        "default": false,
+        "description": "Automatically logs in and fetches a fresh JWT when needed. When enabled you must provide Entrez Username, Entrez Password, and Envoy Serial Number"
+      },
+      "entrezUsername": {
+        "title": "Entrez Username",
+        "type": "string",
+        "default": "",
+        "description": "Your Enphase account email used for Enlighten and Entrez login. Required when Auto JWT Token Refresh is enabled"
+      },
+      "entrezPassword": {
+        "title": "Entrez Password",
+        "type": "string",
+        "default": "",
+        "description": "Your Enphase account password. Required when Auto JWT Token Refresh is enabled"
+      },
+      "envoySerial": {
+        "title": "Envoy Serial Number",
+        "type": "string",
+        "default": "",
+        "description": "Serial number of your Envoy or IQ Gateway. Required when Auto JWT Token Refresh is enabled"
+      },
       "enableInverterLeakSensor": {
         "title": "Enable Inverter Failure Monitoring",
         "type": "boolean",
         "default": true,
-        "description": "Expose a Leak Sensor in HomeKit that triggers when one or more inverters go offline"
+        "description": "When enabled, an Inverter Alert Leak Sensor is created in HomeKit. It triggers when the number of online inverters is lower than expected"
       },
-
       "expectedInverters": {
         "title": "Expected Number of Inverters",
         "type": "integer",
         "default": 0,
         "minimum": 0,
         "maximum": 200,
-        "description": "If set to 0, the plugin automatically learns the inverter count from the first successful reading"
+        "description": "Set to 0 to learn automatically from the first successful inverter reading. Set a fixed number if you want strict monitoring"
       },
-
       "inverterDebug": {
         "title": "Inverter Debug Logging",
         "type": "boolean",
         "default": false,
-        "description": "Log detailed information about inverter checks, data source and inverter counts"
+        "description": "Logs which inverter source is used and the online versus expected counts"
       },
-
       "debugLogging": {
         "title": "Production Debug Logging",
         "type": "boolean",
         "default": false,
-        "description": "Log solar production watts on every poll at debug level"
+        "description": "Logs production watts on every poll at debug level"
       },
-
       "debugBurstCount": {
-        "title": "Temporary Debug Burst",
+        "title": "Temporary Debug Burst Count",
         "type": "integer",
         "default": 0,
         "minimum": 0,
         "maximum": 200,
-        "description": "Log the next N polling cycles at info level, then stop automatically"
+        "description": "Logs the next N polling cycles at info level, then stops automatically. Useful for short diagnostics"
       }
     }
   }

@@ -24,13 +24,9 @@ class EnvoySolarPlatform {
     this.learnedExpectedInverters = 0;
     this.lastLeakState = null;
 
-    this.lastInverterDebug = {
-      source: 'none',
-      onlineCount: 0,
-      expected: 0,
-      serialsSeen: [],
-      lastError: '',
-    };
+    this.cachedJwt = '';
+    this.cachedJwtExp = 0;
+    this.refreshInFlight = null;
 
     this.api.on('didFinishLaunching', () => {
       this.log.info('Platform gestart');
@@ -47,12 +43,90 @@ class EnvoySolarPlatform {
     return this.config.enableInverterLeakSensor !== false;
   }
 
+  isAutoJwtEnabled() {
+    return Boolean(this.config.autoJwt);
+  }
+
+  getHost() {
+    return this.config.host;
+  }
+
+  getBaseUrl() {
+    const protocol = this.config.protocol || 'https';
+    return `${protocol}://${this.getHost()}`;
+  }
+
+  isInsecureTLSEnabled() {
+    return Boolean(this.config.allowInsecureTLS);
+  }
+
+  getMode() {
+    return this.config.mode || 'productionJson';
+  }
+
+  getThresholds() {
+    const onT = Number(this.config.onThresholdW ?? 80);
+    const offT = Number(this.config.offThresholdW ?? 30);
+    return { onT, offT };
+  }
+
+  isDebugLoggingEnabled() {
+    return Boolean(this.config.debugLogging);
+  }
+
+  isInverterDebugEnabled() {
+    return Boolean(this.config.inverterDebug);
+  }
+
+  getDebugBurstCount() {
+    const n = Number(this.config.debugBurstCount ?? 0);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.floor(n);
+  }
+
+  consumeDebugBurst() {
+    const n = this.getDebugBurstCount();
+    if (n <= 0) return 0;
+    this.config.debugBurstCount = n - 1;
+    return n;
+  }
+
+  getExpectedInverters() {
+    const n = Number(this.config.expectedInverters ?? 0);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.floor(n);
+  }
+
+  getManualToken() {
+    const t = this.config.token;
+    if (!t) return '';
+    return String(t).trim();
+  }
+
+  getEntrezUsername() {
+    const u = this.config.entrezUsername;
+    if (!u) return '';
+    return String(u).trim();
+  }
+
+  getEntrezPassword() {
+    const p = this.config.entrezPassword;
+    if (!p) return '';
+    return String(p);
+  }
+
+  getEnvoySerial() {
+    const s = this.config.envoySerial;
+    if (!s) return '';
+    return String(s).trim();
+  }
+
   setupAccessory() {
     const name = this.config.name || 'Solar Production';
-    const host = this.config.host;
+    const host = this.getHost();
 
     if (!host) {
-      this.log.error('Config mist host. Voorbeeld host: "envoy.local" of "192.168.1.50"');
+      this.log.error('Config mist host. Voorbeeld: envoy.local of 192.168.1.50');
       return;
     }
 
@@ -110,7 +184,7 @@ class EnvoySolarPlatform {
       const existing = this.accessory.getService(this.Service.LeakSensor);
       if (existing) {
         this.accessory.removeService(existing);
-        this.log.info('Inverter Alert Leak Sensor is disabled and has been removed');
+        this.log.info('Inverter Alert is uitgeschakeld en verwijderd');
       }
     }
 
@@ -149,56 +223,6 @@ class EnvoySolarPlatform {
     this.pollTimer = setInterval(tick, interval * 1000);
   }
 
-  getThresholds() {
-    const onT = Number(this.config.onThresholdW ?? 80);
-    const offT = Number(this.config.offThresholdW ?? 30);
-    return { onT, offT };
-  }
-
-  getMode() {
-    return this.config.mode || 'productionJson';
-  }
-
-  getHost() {
-    return this.config.host;
-  }
-
-  getToken() {
-    const t = this.config.token;
-    if (!t) return '';
-    return String(t).trim();
-  }
-
-  getBaseUrl() {
-    const protocol = this.config.protocol || 'https';
-    return `${protocol}://${this.getHost()}`;
-  }
-
-  isInsecureTLSEnabled() {
-    return Boolean(this.config.allowInsecureTLS);
-  }
-
-  isDebugLoggingEnabled() {
-    return Boolean(this.config.debugLogging);
-  }
-
-  isInverterDebugEnabled() {
-    return Boolean(this.config.inverterDebug);
-  }
-
-  getDebugBurstCount() {
-    const n = Number(this.config.debugBurstCount ?? 0);
-    if (!Number.isFinite(n) || n < 0) return 0;
-    return Math.floor(n);
-  }
-
-  consumeDebugBurst() {
-    const n = this.getDebugBurstCount();
-    if (n <= 0) return 0;
-    this.config.debugBurstCount = n - 1;
-    return n;
-  }
-
   logWatts(productionWatts) {
     const burst = this.getDebugBurstCount();
     const debugEnabled = this.isDebugLoggingEnabled();
@@ -214,56 +238,40 @@ class EnvoySolarPlatform {
     }
   }
 
-  getExpectedInverters() {
-    const n = Number(this.config.expectedInverters ?? 0);
-    if (!Number.isFinite(n) || n < 0) return 0;
-    return Math.floor(n);
-  }
-
   markProductionFault() {
-    if (!this.accessory) return;
-    const service = this.accessory.getService(this.Service.ContactSensor);
+    const service = this.accessory?.getService(this.Service.ContactSensor);
     if (!service) return;
-
     if (service.testCharacteristic(this.Characteristic.StatusFault)) {
       service.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.GENERAL_FAULT);
     }
   }
 
   clearProductionFault() {
-    if (!this.accessory) return;
-    const service = this.accessory.getService(this.Service.ContactSensor);
+    const service = this.accessory?.getService(this.Service.ContactSensor);
     if (!service) return;
-
     if (service.testCharacteristic(this.Characteristic.StatusFault)) {
       service.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.NO_FAULT);
     }
   }
 
   markInverterFault() {
-    if (!this.accessory) return;
-    const service = this.accessory.getService(this.Service.LeakSensor);
+    const service = this.accessory?.getService(this.Service.LeakSensor);
     if (!service) return;
-
     if (service.testCharacteristic(this.Characteristic.StatusFault)) {
       service.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.GENERAL_FAULT);
     }
   }
 
   clearInverterFault() {
-    if (!this.accessory) return;
-    const service = this.accessory.getService(this.Service.LeakSensor);
+    const service = this.accessory?.getService(this.Service.LeakSensor);
     if (!service) return;
-
     if (service.testCharacteristic(this.Characteristic.StatusFault)) {
       service.updateCharacteristic(this.Characteristic.StatusFault, this.Characteristic.StatusFault.NO_FAULT);
     }
   }
 
   updateProductionState(productionWatts) {
-    if (!this.accessory) return;
-
-    const service = this.accessory.getService(this.Service.ContactSensor);
+    const service = this.accessory?.getService(this.Service.ContactSensor);
     if (!service) return;
 
     const { onT, offT } = this.getThresholds();
@@ -287,9 +295,7 @@ class EnvoySolarPlatform {
   }
 
   async checkInvertersAndUpdateLeak() {
-    if (!this.accessory) return;
-
-    const leakService = this.accessory.getService(this.Service.LeakSensor);
+    const leakService = this.accessory?.getService(this.Service.LeakSensor);
     if (!leakService) return;
 
     const inverterInfo = await this.readInverterInfo();
@@ -301,12 +307,6 @@ class EnvoySolarPlatform {
     }
 
     const expected = configuredExpected > 0 ? configuredExpected : this.learnedExpectedInverters;
-
-    this.lastInverterDebug = {
-      ...inverterInfo,
-      expected,
-    };
-
     const missing = inverterInfo.onlineCount < expected;
 
     const nextLeakState = missing
@@ -317,12 +317,9 @@ class EnvoySolarPlatform {
     this.clearInverterFault();
 
     if (this.isInverterDebugEnabled()) {
-      const src = inverterInfo.source;
-      const online = inverterInfo.onlineCount;
-      const exp = expected;
+      const serialInfo = inverterInfo.serialsSeen.length ? ` serials=${inverterInfo.serialsSeen.length}` : '';
       const err = inverterInfo.lastError ? ` error=${inverterInfo.lastError}` : '';
-      const serialInfo = inverterInfo.serialsSeen.length > 0 ? ` serials=${inverterInfo.serialsSeen.length}` : '';
-      this.log.info(`Inverter debug: source=${src} online=${online} expected=${exp}${serialInfo}${err}`);
+      this.log.info(`Inverter debug: source=${inverterInfo.source} online=${inverterInfo.onlineCount} expected=${expected}${serialInfo}${err}`);
     } else {
       this.log.debug(`Inverters: online ${inverterInfo.onlineCount}, expected ${expected}`);
     }
@@ -332,9 +329,6 @@ class EnvoySolarPlatform {
 
       if (missing) {
         this.log.warn(`Inverter Alert: online ${inverterInfo.onlineCount}, expected ${expected}`);
-        if (this.isInverterDebugEnabled() && inverterInfo.serialsSeen.length > 0) {
-          this.log.warn(`Inverter serials seen: ${inverterInfo.serialsSeen.slice(0, 25).join(', ')}`);
-        }
       } else {
         this.log.info(`Inverter Alert cleared: online ${inverterInfo.onlineCount}, expected ${expected}`);
       }
@@ -436,29 +430,200 @@ class EnvoySolarPlatform {
   }
 
   async fetchJson(url) {
-    const headers = { Accept: 'application/json' };
+    const res = await this.fetchWithAuthRetry(url);
+    const text = await res.body.text();
+    return JSON.parse(text);
+  }
 
-    const token = this.getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
+  async fetchWithAuthRetry(url) {
+    const attempt = async () => {
+      const headers = { Accept: 'application/json' };
+      const token = await this.getBearerToken();
+      if (token) headers.Authorization = `Bearer ${token}`;
 
-    const allowInsecureTLS = this.isInsecureTLSEnabled();
+      const allowInsecureTLS = this.isInsecureTLSEnabled();
+      const dispatcher = url.startsWith('https://')
+        ? new Agent({ connect: { rejectUnauthorized: !allowInsecureTLS } })
+        : undefined;
 
-    const dispatcher = url.startsWith('https://')
-      ? new Agent({ connect: { rejectUnauthorized: !allowInsecureTLS } })
-      : undefined;
+      return request(url, { method: 'GET', headers, dispatcher });
+    };
 
-    const res = await request(url, { method: 'GET', headers, dispatcher });
+    let res = await attempt();
 
     if (res.statusCode === 401 || res.statusCode === 403) {
-      throw new Error(`HTTP ${res.statusCode} unauthorized. Check token and that you pasted token only without Bearer.`);
+      await res.body.text().catch(() => '');
+      if (this.isAutoJwtEnabled()) {
+        this.log.warn('Envoy geeft 401. Auto JWT staat aan, token wordt vernieuwd en request wordt opnieuw geprobeerd.');
+        await this.forceRefreshJwt();
+        res = await attempt();
+      }
     }
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
       const body = await res.body.text().catch(() => '');
-      throw new Error(`HTTP ${res.statusCode} on ${url} ${body}`);
+      if (res.statusCode === 401 || res.statusCode === 403) {
+        throw new Error(`HTTP ${res.statusCode} unauthorized. Check token or Auto JWT settings.`);
+      }
+      throw new Error(`HTTP ${res.statusCode} on ${url} ${body}`.trim());
     }
 
+    return res;
+  }
+
+  async getBearerToken() {
+    const manual = this.getManualToken();
+    if (!this.isAutoJwtEnabled()) return manual;
+
+    const now = Math.floor(Date.now() / 1000);
+    const margin = 300;
+
+    if (this.cachedJwt && this.cachedJwtExp && now < (this.cachedJwtExp - margin)) {
+      return this.cachedJwt;
+    }
+
+    return this.refreshJwtIfNeeded();
+  }
+
+  async refreshJwtIfNeeded() {
+    if (this.refreshInFlight) return this.refreshInFlight;
+
+    this.refreshInFlight = (async () => {
+      const jwt = await this.obtainJwtFromEntrez();
+      const exp = this.decodeJwtExp(jwt);
+
+      if (!exp) {
+        this.log.warn('JWT opgehaald maar exp kon niet worden gelezen. Token wordt toch gebruikt.');
+      }
+
+      this.cachedJwt = jwt;
+      this.cachedJwtExp = exp || 0;
+
+      const now = Math.floor(Date.now() / 1000);
+      if (exp) {
+        const mins = Math.max(0, Math.floor((exp - now) / 60));
+        this.log.info(`Nieuwe JWT opgehaald. Geldig voor ongeveer ${mins} minuten.`);
+      } else {
+        this.log.info('Nieuwe JWT opgehaald.');
+      }
+
+      return this.cachedJwt;
+    })().finally(() => {
+      this.refreshInFlight = null;
+    });
+
+    return this.refreshInFlight;
+  }
+
+  async forceRefreshJwt() {
+    this.cachedJwt = '';
+    this.cachedJwtExp = 0;
+    await this.refreshJwtIfNeeded();
+  }
+
+  decodeJwtExp(jwt) {
+    try {
+      const parts = String(jwt).split('.');
+      if (parts.length < 2) return 0;
+      const payloadB64 = parts[1];
+      const json = JSON.parse(Buffer.from(this.base64UrlToBase64(payloadB64), 'base64').toString('utf8'));
+      const exp = Number(json.exp || 0);
+      return Number.isFinite(exp) ? exp : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  base64UrlToBase64(s) {
+    let out = String(s).replace(/-/g, '+').replace(/_/g, '/');
+    while (out.length % 4) out += '=';
+    return out;
+  }
+
+  async obtainJwtFromEntrez() {
+    const username = this.getEntrezUsername();
+    const password = this.getEntrezPassword();
+    const serial = this.getEnvoySerial();
+
+    if (!username || !password || !serial) {
+      throw new Error('Auto JWT staat aan maar entrezUsername, entrezPassword of envoySerial ontbreekt.');
+    }
+
+    const sessionId = await this.loginEnlightenAndGetSessionId(username, password);
+    const jwt = await this.requestJwtFromEntrez(sessionId, username, serial);
+
+    if (!jwt || typeof jwt !== 'string') {
+      throw new Error('Entrez gaf geen geldige JWT terug.');
+    }
+
+    return jwt.trim();
+  }
+
+  async loginEnlightenAndGetSessionId(username, password) {
+    const url = 'https://enlighten.enphaseenergy.com/login/login.json';
+
+    const body = new URLSearchParams();
+    body.set('user[email]', username);
+    body.set('user[password]', password);
+
+    const res = await request(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+      body: body.toString(),
+    });
+
     const text = await res.body.text();
-    return JSON.parse(text);
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw new Error(`Enlighten login failed HTTP ${res.statusCode}`);
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error('Enlighten login response is geen JSON.');
+    }
+
+    const sessionId = data && data.session_id;
+    if (!sessionId) throw new Error('Enlighten login gaf geen session_id terug.');
+
+    return String(sessionId);
+  }
+
+  async requestJwtFromEntrez(sessionId, username, serialNum) {
+    const url = 'https://entrez.enphaseenergy.com/tokens';
+
+    const payload = {
+      session_id: sessionId,
+      serial_num: serialNum,
+      username: username,
+    };
+
+    const res = await request(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/plain, */*' },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.body.text();
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw new Error(`Entrez token request failed HTTP ${res.statusCode}`);
+    }
+
+    const trimmed = String(text || '').trim();
+
+    if (!trimmed) throw new Error('Entrez token response was leeg.');
+
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      const obj = JSON.parse(trimmed);
+      const jwt = obj.token || obj.jwt || obj.access_token || obj.data || obj;
+      if (typeof jwt === 'string') return jwt;
+      if (typeof obj === 'string') return obj;
+      throw new Error('Entrez token response JSON bevat geen token veld.');
+    }
+
+    return trimmed;
   }
 }
